@@ -1,3 +1,10 @@
+databases:
+  - name: denora-candles-db
+    plan: free
+    region: singapore # Close to India for low latency
+    databaseName: denora_candles
+    user: denora_user
+
 services:
   - type: web
     name: denora-candles-api
@@ -5,18 +12,23 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     plan: free
-    region: singapore # Close to India
+    region: singapore
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 8080
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: denora-candles-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
       - key: FRONTEND_URL
         value: https://denoracandles.com
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:5173,http://localhost:3000,https://denoracandles.com,https://denora-candles.vercel.app
       - key: PAYMENT_GATEWAY
         value: razorpay
       - key: RAZORPAY_KEY_ID
