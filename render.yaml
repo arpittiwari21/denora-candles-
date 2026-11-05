@@ -40,12 +40,12 @@ services:
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
 
-  # 3. Frontend Storefront Website (React / Vite SPA)
-  - type: static
+  # 3. Frontend Storefront Website (React / Vite Static Site)
+  - type: web
     name: denora-candles-web
     runtime: static
     buildCommand: npm install && npm run build
-    publishDir: dist
+    staticPublishPath: ./dist
     routes:
       - type: rewrite
         source: /*
