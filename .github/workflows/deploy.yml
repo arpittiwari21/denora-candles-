@@ -1,0 +1,62 @@
+name: Deploy Denora Candles API to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-south1 # Or us-central1
+  SERVICE_NAME: denora-candles-api
+  GAR_REPOSITORY: denora-docker-repo
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_TAG="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          LATEST_TAG="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.SERVICE_NAME }}:latest"
+          
+          docker build -t "$IMAGE_TAG" -t "$LATEST_TAG" ./backend
+          docker push "$IMAGE_TAG"
+          docker push "$LATEST_TAG"
+
+      - name: Deploy to Google Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          flags: |
+            --allow-unauthenticated
+            --min-instances=0
+            --max-instances=10
+            --memory=512Mi
+            --cpu=1
+            --concurrency=80
+            --timeout=60s
+            --set-env-vars=NODE_ENV=production,FRONTEND_URL=https://denoracandles.com,PAYMENT_GATEWAY=razorpay
+            --set-secrets=DATABASE_URL=denora-db-url:latest,JWT_SECRET=denora-jwt-secret:latest,RAZORPAY_KEY_ID=denora-rzp-key:latest,RAZORPAY_KEY_SECRET=denora-rzp-secret:latest

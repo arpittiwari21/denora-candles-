@@ -1,0 +1,94 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum OrderStatus {
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  password_hash String
+  role          Role      @default(CUSTOMER)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  orders        Order[]
+
+  @@map("users")
+}
+
+model Product {
+  id              String      @id @default(uuid())
+  title           String
+  description     String
+  scent_notes     String
+  burn_time       String
+  price           Float
+  inventory_stock Int         @default(0)
+  image_urls      String[]
+  category        String
+  is_featured     Boolean     @default(false)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  order_items     OrderItem[]
+
+  @@index([category])
+  @@index([is_featured])
+  @@map("products")
+}
+
+model Order {
+  id               String        @id @default(uuid())
+  user_id          String?
+  user             User?         @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  total_amount     Float
+  shipping_address Json
+  payment_status   PaymentStatus @default(PENDING)
+  order_status     OrderStatus   @default(PROCESSING)
+  payment_id       String?
+  payment_gateway  String        @default("razorpay") // "razorpay" or "stripe"
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  items            OrderItem[]
+
+  @@index([user_id])
+  @@index([payment_status])
+  @@index([order_status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  order_id   String
+  order      Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product_id String
+  product    Product  @relation(fields: [product_id], references: [id], onDelete: Restrict)
+  quantity   Int
+  price      Float
+
+  @@map("order_items")
+}
